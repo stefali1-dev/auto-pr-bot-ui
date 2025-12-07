@@ -5,40 +5,45 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Github, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Github, Loader2, XCircle, ArrowLeft } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { HowItWorks } from '@/components/how-it-works';
+import { StatusTracker } from '@/components/status-tracker';
 
-interface ProcessingStatus {
-  status: 'idle' | 'processing' | 'success' | 'error';
-  message?: string;
+interface ProcessingState {
+  isTracking: boolean;
+  requestId?: string;
   repository?: string;
+  error?: string;
 }
 
 export default function Home() {
   const [repositoryUrl, setRepositoryUrl] = useState('');
   const [modificationPrompt, setModificationPrompt] = useState('');
   const [githubUsername, setGithubUsername] = useState('');
-  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>({ status: 'idle' });
+  const [processingState, setProcessingState] = useState<ProcessingState>({ isTracking: false });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('[Home] Form submitted');
+    
     if (!repositoryUrl || !modificationPrompt) {
-      setProcessingStatus({
-        status: 'error',
-        message: 'Repository URL and modification prompt are required'
+      setProcessingState({
+        isTracking: false,
+        error: 'Repository URL and modification prompt are required'
       });
       return;
     }
 
     setIsSubmitting(true);
-    setProcessingStatus({ status: 'processing', message: 'Submitting your request...' });
+    setProcessingState({ isTracking: false });
 
     try {
-      // TODO: Replace with actual API endpoint URL
-      const apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT || 'YOUR_API_GATEWAY_URL_HERE';
+      const apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT || 'https://k80r4uyfj1.execute-api.eu-central-1.amazonaws.com/Prod/process';
+      
+      console.log('[Home] Calling API:', apiEndpoint);
       
       const response = await fetch(apiEndpoint, {
         method: 'POST',
@@ -53,32 +58,40 @@ export default function Home() {
       });
 
       const data = await response.json();
+      console.log('[Home] API response:', data);
 
-      if (response.ok) {
-        setProcessingStatus({
-          status: 'success',
-          message: data.message || 'Your request is being processed. Check CloudWatch logs for progress.',
-          repository: data.repository || repositoryUrl
+      if (response.ok && data.requestId) {
+        // Start tracking the request
+        console.log('[Home] Starting tracking for requestId:', data.requestId);
+        setProcessingState({
+          isTracking: true,
+          requestId: data.requestId,
+          repository: data.repository || repositoryUrl,
         });
-        
-        // Reset form after successful submission
-        setRepositoryUrl('');
-        setModificationPrompt('');
-        setGithubUsername('');
       } else {
-        setProcessingStatus({
-          status: 'error',
-          message: data.message || 'Failed to submit request'
+        console.error('[Home] API error:', data);
+        setProcessingState({
+          isTracking: false,
+          error: data.error || 'Failed to submit request'
         });
       }
     } catch (error) {
-      setProcessingStatus({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'An unexpected error occurred'
+      console.error('[Home] Exception:', error);
+      setProcessingState({
+        isTracking: false,
+        error: error instanceof Error ? error.message : 'An unexpected error occurred'
       });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleReset = () => {
+    console.log('[Home] Reset clicked');
+    setProcessingState({ isTracking: false });
+    setRepositoryUrl('');
+    setModificationPrompt('');
+    setGithubUsername('');
   };
 
   return (
@@ -107,15 +120,36 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-12 max-w-3xl">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Create Automated Pull Request</CardTitle>
-            <CardDescription>
-              Fork a repository, make AI-powered modifications, and submit a pull request automatically
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+        {processingState.isTracking && processingState.requestId ? (
+          /* Status Tracker View */
+          <div className="space-y-6">
+            <Button
+              onClick={handleReset}
+              variant="ghost"
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Create Another PR
+            </Button>
+            
+            <StatusTracker
+              requestId={processingState.requestId}
+              repository={processingState.repository || repositoryUrl}
+              apiEndpoint={process.env.NEXT_PUBLIC_API_ENDPOINT || 'https://k80r4uyfj1.execute-api.eu-central-1.amazonaws.com/Prod/process'}
+            />
+          </div>
+        ) : (
+          /* Form View */
+          <>
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle>Create Automated Pull Request</CardTitle>
+                <CardDescription>
+                  Fork a repository, make AI-powered modifications, and submit a pull request automatically
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
               {/* Repository URL */}
               <div className="space-y-2">
                 <Label htmlFor="repositoryUrl">
@@ -130,9 +164,6 @@ export default function Home() {
                   required
                   disabled={isSubmitting}
                 />
-                <p className="text-xs text-muted-foreground">
-                  The GitHub repository you want to contribute to
-                </p>
               </div>
 
               {/* Modification Prompt */}
@@ -150,9 +181,6 @@ export default function Home() {
                   rows={6}
                   className="resize-none"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Be specific about what changes you'd like the AI to make
-                </p>
               </div>
 
               {/* GitHub Username (Optional) */}
@@ -171,44 +199,15 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Status Messages */}
-              {processingStatus.status !== 'idle' && (
-                <div
-                  className={`rounded-lg border p-4 ${
-                    processingStatus.status === 'processing'
-                      ? 'border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950'
-                      : processingStatus.status === 'success'
-                      ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950'
-                      : 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950'
-                  }`}
-                >
+              {/* Error Message */}
+              {processingState.error && (
+                <div className="rounded-lg border p-4 border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 animate-in fade-in duration-300">
                   <div className="flex items-start gap-3">
-                    {processingStatus.status === 'processing' && (
-                      <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400 mt-0.5" />
-                    )}
-                    {processingStatus.status === 'success' && (
-                      <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
-                    )}
-                    {processingStatus.status === 'error' && (
-                      <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
-                    )}
+                    <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
                     <div className="flex-1">
-                      <p
-                        className={`text-sm font-medium ${
-                          processingStatus.status === 'processing'
-                            ? 'text-blue-900 dark:text-blue-100'
-                            : processingStatus.status === 'success'
-                            ? 'text-green-900 dark:text-green-100'
-                            : 'text-red-900 dark:text-red-100'
-                        }`}
-                      >
-                        {processingStatus.message}
+                      <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                        {processingState.error}
                       </p>
-                      {processingStatus.repository && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Repository: {processingStatus.repository}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -244,6 +243,8 @@ export default function Home() {
 
         {/* How It Works Section */}
         <HowItWorks />
+          </>
+        )}
       </main>
 
       {/* Footer */}
