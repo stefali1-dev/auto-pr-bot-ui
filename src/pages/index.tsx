@@ -88,15 +88,15 @@ export default function Home() {
         <meta name="description" content="Automate GitHub contributions with AI. Fork repositories, make intelligent code modifications, and create pull requests automatically." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
-      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Github className="h-8 w-8" />
+              <Github className="h-8 w-8 text-foreground" />
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">Auto PR Bot</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">Auto PR Bot</h1>
                 <p className="text-sm text-muted-foreground">AI-powered pull request automation</p>
               </div>
             </div>
@@ -239,9 +239,6 @@ export default function Home() {
           <p>
             This bot will fork the repository, create a new branch, apply AI-powered modifications,
             and submit a pull request automatically.
-          </p>
-          <p className="text-xs">
-            Processing happens asynchronously. You'll receive confirmation once submitted.
           </p>
         </div>
 
