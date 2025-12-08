@@ -28,8 +28,6 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('[Home] Form submitted');
-    
     if (!repositoryUrl || !modificationPrompt) {
       setProcessingState({
         isTracking: false,
@@ -44,8 +42,6 @@ export default function Home() {
     try {
       const apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT || 'https://k80r4uyfj1.execute-api.eu-central-1.amazonaws.com/Prod/process';
       
-      console.log('[Home] Calling API:', apiEndpoint);
-      
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
@@ -59,25 +55,21 @@ export default function Home() {
       });
 
       const data = await response.json();
-      console.log('[Home] API response:', data);
 
       if (response.ok && data.requestId) {
         // Start tracking the request
-        console.log('[Home] Starting tracking for requestId:', data.requestId);
         setProcessingState({
           isTracking: true,
           requestId: data.requestId,
           repository: data.repository || repositoryUrl,
         });
       } else {
-        console.error('[Home] API error:', data);
         setProcessingState({
           isTracking: false,
           error: data.error || 'Failed to submit request'
         });
       }
     } catch (error) {
-      console.error('[Home] Exception:', error);
       setProcessingState({
         isTracking: false,
         error: error instanceof Error ? error.message : 'An unexpected error occurred'
@@ -88,11 +80,14 @@ export default function Home() {
   };
 
   const handleReset = () => {
-    console.log('[Home] Reset clicked');
     setProcessingState({ isTracking: false });
     setRepositoryUrl('');
     setModificationPrompt('');
     setGithubUsername('');
+  };
+
+  const handleRejected = () => {
+    setProcessingState({ isTracking: false });
   };
 
   return (
@@ -137,6 +132,7 @@ export default function Home() {
               requestId={processingState.requestId}
               repository={processingState.repository || repositoryUrl}
               apiEndpoint={process.env.NEXT_PUBLIC_API_ENDPOINT || 'https://k80r4uyfj1.execute-api.eu-central-1.amazonaws.com/Prod/process'}
+              onRejected={handleRejected}
             />
           </div>
         ) : (

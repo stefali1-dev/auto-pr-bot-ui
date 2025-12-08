@@ -16,7 +16,7 @@ export function HowItWorks() {
     {
       icon: Bot,
       title: 'AI Modifications',
-      description: 'OpenAI analyzes the repo and applies your requested modifications',
+      description: 'The bot analyzes the repo and applies your requested modifications',
     },
     {
       icon: GitPullRequest,

@@ -66,7 +66,7 @@ export function RepositoryInput({ value, onChange, disabled }: RepositoryInputPr
           setShowDropdown(false);
         }
       } catch (error) {
-        console.error('Failed to search repositories:', error);
+        
         setSearchResults([]);
         setShowDropdown(false);
       } finally {

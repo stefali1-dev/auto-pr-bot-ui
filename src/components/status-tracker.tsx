@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, Loader2, GitFork, Download, Search, FileEdit, GitCommit, GitPullRequest, ExternalLink } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, GitFork, Download, Search, FileEdit, GitCommit, GitPullRequest, ExternalLink, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -8,6 +8,7 @@ interface StatusTrackerProps {
   repository: string;
   apiEndpoint: string;
   onComplete?: () => void;
+  onRejected?: () => void;
 }
 
 interface StatusResponse {
@@ -29,6 +30,7 @@ interface StepInfo {
 
 const steps: StepInfo[] = [
   { id: 'pending', label: 'Initializing', icon: Loader2 },
+  { id: 'validating', label: 'Validating Prompt', icon: AlertCircle },
   { id: 'forking', label: 'Forking Repository', icon: GitFork },
   { id: 'cloning', label: 'Cloning Fork', icon: Download },
   { id: 'analyzing', label: 'Analyzing Code', icon: Search },
@@ -37,7 +39,7 @@ const steps: StepInfo[] = [
   { id: 'creating_pr', label: 'Creating Pull Request', icon: GitPullRequest },
 ];
 
-export function StatusTracker({ requestId, repository, apiEndpoint, onComplete }: StatusTrackerProps) {
+export function StatusTracker({ requestId, repository, apiEndpoint, onComplete, onRejected }: StatusTrackerProps) {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(true);
@@ -49,34 +51,32 @@ export function StatusTracker({ requestId, repository, apiEndpoint, onComplete }
     const pollStatus = async () => {
       try {
         const statusEndpoint = apiEndpoint.replace('/process', `/status/${requestId}`);
-        console.log('[StatusTracker] Polling:', statusEndpoint);
         
         const response = await fetch(statusEndpoint);
 
         if (!response.ok) {
-          console.error('[StatusTracker] Response not OK:', response.status);
           throw new Error(`Failed to fetch status: ${response.status}`);
         }
 
         const data: StatusResponse = await response.json();
-        console.log('[StatusTracker] Status update:', data.status, data.message);
         setStatus(data);
 
-        // Stop polling if completed or errored
+        // Stop polling if completed, rejected, or errored
         if (data.status === 'completed') {
-          console.log('[StatusTracker] Completed - waiting 1 second before showing result');
           setIsPolling(false);
           // Add 1 second delay before showing completion
           setTimeout(() => {
             setShowCompleted(true);
+            if (onComplete) onComplete();
           }, 1000);
+        } else if (data.status === 'rejected') {
+          setIsPolling(false);
+          setShowCompleted(true);
         } else if (data.status === 'error') {
-          console.log('[StatusTracker] Error status');
           setIsPolling(false);
           setShowCompleted(true);
         }
       } catch (err) {
-        console.error('[StatusTracker] Error polling:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch status');
         setIsPolling(false);
       }
@@ -89,7 +89,6 @@ export function StatusTracker({ requestId, repository, apiEndpoint, onComplete }
     const interval = setInterval(pollStatus, 3000);
 
     return () => {
-      console.log('[StatusTracker] Cleanup: clearing interval');
       clearInterval(interval);
     };
   }, [requestId, apiEndpoint, isPolling]);
@@ -126,6 +125,76 @@ export function StatusTracker({ requestId, repository, apiEndpoint, onComplete }
           >
             Retry
           </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (status?.status === 'rejected') {
+    return (
+      <Card className="shadow-lg border-amber-200 dark:border-amber-900 animate-in fade-in duration-500">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <AlertCircle className="h-5 w-5" />
+            Prompt Needs Improvement
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg bg-amber-50 dark:bg-amber-950 p-4 border border-amber-200 dark:border-amber-900">
+            <p className="text-sm text-amber-900 dark:text-amber-100 font-medium mb-2">
+              Your modification request is too vague or unclear.
+            </p>
+            {status.errorDetails && (
+              <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
+                {status.errorDetails}
+              </p>
+            )}
+            <div className="mt-4 pt-4 border-t border-amber-200 dark:border-amber-800">
+              <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-2">
+                Tips for writing clear prompts:
+              </p>
+              <ul className="text-xs text-amber-800 dark:text-amber-200 space-y-1.5 list-disc list-inside">
+                <li>Be specific about which file(s) to modify</li>
+                <li>Clearly describe what changes you want</li>
+                <li>Include examples if helpful</li>
+                <li>Avoid vague terms like "improve" or "make better"</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="rounded-lg bg-muted p-4 border">
+            <p className="text-xs font-semibold text-foreground mb-2">Example good prompts:</p>
+            <ul className="text-xs text-muted-foreground space-y-1.5">
+              <li>✓ "Add a 'Hello World' comment to the README.md file"</li>
+              <li>✓ "Update the package.json version to 2.0.0"</li>
+              <li>✓ "Add error handling to the main.go file"</li>
+            </ul>
+          </div>
+
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p>
+              Repository:{' '}
+              <a
+                href={status.repository}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {status.repository}
+              </a>
+            </p>
+            <p>Request ID: {requestId}</p>
+          </div>
+          
+          {onRejected && (
+            <Button
+              onClick={onRejected}
+              variant="default"
+              className="w-full"
+            >
+              Try Again with Better Prompt
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
@@ -228,13 +297,6 @@ export function StatusTracker({ requestId, repository, apiEndpoint, onComplete }
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Current Status Message */}
-        <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-4 border border-blue-200 dark:border-blue-900">
-          <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
-            {status?.message || 'Starting...'}
-          </p>
-        </div>
-
         {/* Progress Steps */}
         <div className="space-y-3">
           {steps.map((step, index) => {
