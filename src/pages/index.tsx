@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Github, Loader2, XCircle, ArrowLeft } from 'lucide-react';
+import { Github, Loader2, XCircle, ArrowLeft, Clock, AlertTriangle } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { HowItWorks } from '@/components/how-it-works';
 import { StatusTracker } from '@/components/status-tracker';
@@ -16,6 +16,10 @@ interface ProcessingState {
   requestId?: string;
   repository?: string;
   error?: string;
+  isRateLimited?: boolean;
+  rateLimitMessage?: string;
+  resetTime?: string;
+  resetTimeRelative?: string;
 }
 
 export default function Home() {
@@ -24,6 +28,26 @@ export default function Home() {
   const [githubUsername, setGithubUsername] = useState('');
   const [processingState, setProcessingState] = useState<ProcessingState>({ isTracking: false });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Format time difference in human-readable format
+  const formatRelativeTime = (timestamp: number): string => {
+    const now = Date.now();
+    const diff = timestamp * 1000 - now; // Convert to milliseconds
+    
+    if (diff <= 0) return 'now';
+    
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) {
+      const remainingMinutes = minutes % 60;
+      return remainingMinutes > 0 
+        ? `in ${hours}h ${remainingMinutes}m`
+        : `in ${hours}h`;
+    }
+    
+    return `in ${minutes}m`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +79,44 @@ export default function Home() {
       });
 
       const data = await response.json();
+
+      // Handle rate limiting
+      if (response.status === 429) {
+        // Check if we have structured rate limit data
+        let rateLimitMessage = 'Rate limit exceeded. Please try again later.';
+        let resetTime = '';
+        let resetTimeRelative = '';
+
+        if (data.rateLimit) {
+          const { limit, used, resetAt } = data.rateLimit;
+          const resetDate = new Date(resetAt * 1000);
+          
+          // Format in user's local timezone
+          resetTime = resetDate.toLocaleString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            timeZoneName: 'short'
+          });
+          
+          resetTimeRelative = formatRelativeTime(resetAt);
+          
+          rateLimitMessage = `You've used ${used}/${limit} requests this hour.`;
+        } else if (data.error) {
+          // Fallback to old format if backend hasn't been updated
+          rateLimitMessage = data.error;
+        }
+
+        setProcessingState({
+          isTracking: false,
+          isRateLimited: true,
+          rateLimitMessage,
+          resetTime,
+          resetTimeRelative,
+          error: data.error || 'Rate limit exceeded'
+        });
+        return;
+      }
 
       if (response.ok && data.requestId) {
         // Start tracking the request
@@ -196,13 +258,46 @@ export default function Home() {
               </div>
 
               {/* Error Message */}
-              {processingState.error && (
+              {processingState.error && !processingState.isRateLimited && (
                 <div className="rounded-lg border p-4 border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 animate-in fade-in duration-300">
                   <div className="flex items-start gap-3">
                     <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-red-900 dark:text-red-100">
                         {processingState.error}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Rate Limit Message */}
+              {processingState.isRateLimited && processingState.rateLimitMessage && (
+                <div className="rounded-lg border p-4 border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950 animate-in fade-in duration-300">
+                  <div className="flex items-start gap-3">
+                    <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                        <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-100">
+                          Rate Limit Reached
+                        </p>
+                      </div>
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                        {processingState.rateLimitMessage}
+                      </p>
+                      {processingState.resetTime && (
+                        <div className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                          Next available: {processingState.resetTime}
+                          {processingState.resetTimeRelative && (
+                            <span className="ml-1 text-yellow-700 dark:text-yellow-300">
+                              ({processingState.resetTimeRelative})
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2">
+                        This helps prevent abuse and ensures fair usage for everyone. Thank you for your patience!
                       </p>
                     </div>
                   </div>
@@ -228,14 +323,6 @@ export default function Home() {
             </form>
           </CardContent>
         </Card>
-
-        {/* Info Section */}
-        <div className="mt-8 text-center text-sm text-muted-foreground space-y-2">
-          <p>
-            This bot will fork the repository, create a new branch, apply AI-powered modifications,
-            and submit a pull request automatically.
-          </p>
-        </div>
 
         {/* How It Works Section */}
         <HowItWorks />

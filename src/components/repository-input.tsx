@@ -66,7 +66,6 @@ export function RepositoryInput({ value, onChange, disabled }: RepositoryInputPr
           setShowDropdown(false);
         }
       } catch (error) {
-        
         setSearchResults([]);
         setShowDropdown(false);
       } finally {
