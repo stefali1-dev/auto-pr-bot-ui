@@ -9,6 +9,7 @@ import { Github, Loader2, XCircle, ArrowLeft } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { HowItWorks } from '@/components/how-it-works';
 import { StatusTracker } from '@/components/status-tracker';
+import { RepositoryInput } from '@/components/repository-input';
 
 interface ProcessingState {
   isTracking: boolean;
@@ -155,15 +156,14 @@ export default function Home() {
                 <Label htmlFor="repositoryUrl">
                   Repository URL <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  id="repositoryUrl"
-                  type="url"
-                  placeholder="https://github.com/owner/repository"
+                <RepositoryInput
                   value={repositoryUrl}
-                  onChange={(e) => setRepositoryUrl(e.target.value)}
-                  required
+                  onChange={setRepositoryUrl}
                   disabled={isSubmitting}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Search for a repository or paste the full URL
+                </p>
               </div>
 
               {/* Modification Prompt */}
