@@ -332,16 +332,34 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t mt-16 py-8">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <a
-            href="https://github.com/stefali1-dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 hover:text-foreground transition-colors"
-          >
-            <Github className="h-4 w-4" />
-            @stefali1-dev
-          </a>
+        <div className="container mx-auto px-4 text-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <a
+                href="https://github.com/stefali1-dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 hover:text-foreground transition-colors"
+              >
+                <Github className="h-4 w-4" />
+                @stefali1-dev
+              </a>
+              <span>•</span>
+              <a
+                href="/privacy"
+                className="hover:text-foreground transition-colors"
+              >
+                Privacy Policy
+              </a>
+              <span>•</span>
+              <a
+                href="/terms"
+                className="hover:text-foreground transition-colors"
+              >
+                Terms of Service
+              </a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
