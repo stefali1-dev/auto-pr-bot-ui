@@ -16,7 +16,7 @@ export function HowItWorks() {
     {
       icon: Bot,
       title: 'AI Modifications',
-      description: 'The bot analyzes the repo and applies your requested modifications',
+      description: 'The bot uses GPT-5-mini to analyze the repo and apply your modifications',
     },
     {
       icon: GitPullRequest,
