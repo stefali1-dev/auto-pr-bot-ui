@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Loader2, Github, ExternalLink } from 'lucide-react';
+import { Search, Loader2, Github, ExternalLink, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 interface GitHubRepo {
@@ -22,6 +22,7 @@ export function RepositoryInput({ value, onChange, disabled }: RepositoryInputPr
   const [searchResults, setSearchResults] = useState<GitHubRepo[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [rateLimitError, setRateLimitError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -52,6 +53,7 @@ export function RepositoryInput({ value, onChange, disabled }: RepositoryInputPr
     // Set new timeout for debounced search
     searchTimeoutRef.current = setTimeout(async () => {
       setIsSearching(true);
+      setRateLimitError(false);
       try {
         const response = await fetch(
           `https://api.github.com/search/repositories?q=${encodeURIComponent(trimmedValue)}&per_page=8&sort=stars&order=desc`
@@ -61,6 +63,10 @@ export function RepositoryInput({ value, onChange, disabled }: RepositoryInputPr
           const data = await response.json();
           setSearchResults(data.items || []);
           setShowDropdown(data.items?.length > 0);
+        } else if (response.status === 403) {
+          setRateLimitError(true);
+          setSearchResults([]);
+          setShowDropdown(false);
         } else {
           setSearchResults([]);
           setShowDropdown(false);
@@ -160,7 +166,22 @@ export function RepositoryInput({ value, onChange, disabled }: RepositoryInputPr
         </div>
       </div>
 
-      {/* Dropdown Results */}
+      {rateLimitError && (
+        <div className="absolute z-50 w-full mt-1 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-900 rounded-md shadow-lg p-3 animate-in fade-in duration-300">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-xs font-medium text-yellow-900 dark:text-yellow-100 mb-1">
+                GitHub API Rate Limit Reached
+              </p>
+              <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                You've hit the 60 requests/hour limit for repository searches. Please paste the repository URL directly or try again later.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDropdown && searchResults.length > 0 && (
         <div
           ref={dropdownRef}
